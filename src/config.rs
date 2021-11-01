@@ -1,5 +1,5 @@
-use std::io::{self, BufReader, prelude::*};
-use std::fs::File;
+use std::io::{self, BufReader, prelude::*, ErrorKind};
+use std::fs::{File, read_dir};
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 //use toml;
@@ -11,107 +11,121 @@ pub struct Config {
 }
 
 impl Config {
-    fn new() -> Config {
-        return Config { trash_dir: PathBuf::new() };
+    fn new(path: &PathBuf) -> Config {
+        return Config { trash_dir: PathBuf::from(path) };
     }
 }
 
 pub fn create_config() -> Config {
-    let (conf_loc, trash_loc) = resolve_dirs();
+    let (conf_loc, mut trash_loc) = resolve_dirs();
     let config: Config;
 
-    let mut conf_file = File::open(&conf_loc);
+    match File::open(&conf_loc) {
+        Err(error) => match error.kind() {
+            ErrorKind::NotFound => {
+                println!("Configuration file not found. Creating configuration file.");     
+                let file: File = match File::create(&conf_loc) {
+                    Err(e) => {
+                        panic!("Unable to create configuration file: {:?}", e);
+                    }
+                    Ok(file) => file
+                };
 
-    match conf_file {
-        Err(_file_open_error) => {
-            println!("File not found. Creating configuration file.");     
-            conf_file = File::create(&conf_loc);
-            let mut conf_file = match conf_file {
-                Err(file_create_error) => {
-                    panic!("Unable to create configuration file: {:?}", file_create_error);
-                }
-                Ok(file) => file
-            };
+                trash_loc = verify_trash_loc(trash_loc);
 
-            config = Config { trash_dir: trash_loc };
-            let toml_as_str: String = toml::to_string(&config).unwrap();
-            let bytes: &[u8] = (toml_as_str).as_bytes();
-            let write_success = conf_file.write(bytes);
-            match write_success {
-                Err(write_error) => {
-                    println!("Error writing to config file: {:?}", write_error);
-                }
-                _ => {}
-            }
-            return config;
+
+                config = Config::new(&trash_loc);
+                write_config(&file, &config);
+            } other => { println!("Error while opening configuration file: {:?}", other); return Config::new(&trash_loc) }
         }
         Ok(file) => {
-            let mut buf_reader = BufReader::new(file);
+            let mut buf_reader = BufReader::new(&file);
             let mut contents = String::new();
 
-            let read_success = buf_reader.read_to_string(&mut contents);
-            match read_success {
-                Err(read_error) => {
-                    println!("Error reading configuration file: {:?}", read_error);
-                    return Config::new();
+            match buf_reader.read_to_string(&mut contents) {
+                Err(error) => {
+                    println!("Error reading configuration file: {:?}", error);
+                    return Config::new(&trash_loc);
                 },
                 _ => {
                     let conversion = toml::from_str(&contents);
                     match conversion {
-                        Err(deserialize_error) => {
-                            println!("Deserialization error: {:?}", deserialize_error);
-                            return Config::new();
+                        Err(e) => {
+                            println!("Deserialization error: {:?}", e);
+                            trash_loc = verify_trash_loc(trash_loc);
+                            config = Config { trash_dir: trash_loc };
+                            write_config(&file, &config);
                         },
-                        Ok(conf) => return conf,
+                        Ok(conf) => { config = conf; }
                     }
                 }
             }
         }
     }
+
+    return config;
 }
 
 fn resolve_dirs() -> (PathBuf, PathBuf)  {
-    let     conf_temp: Option<PathBuf> = dirs_next::config_dir();
-    let mut conf_true: PathBuf;
-    match conf_temp {
-        Some(buf) => {
-            conf_true = buf;
-            conf_true.push("trash-rs");
-            conf_true.push("config");
-            conf_true.set_extension("toml");
+    let conf = match dirs_next::config_dir() {
+        Some(mut buf) => {
+            buf.push("trash-rs");
+            buf.push("config");
+            buf.set_extension("toml");
+            buf
         }
         None => {
-            println!("OS \"config\" location unkown. Please specify a directory to hold configuration files.");
-            let mut str_to_buf = String::new();
-            let io_success = io::stdin().read_line(&mut str_to_buf);
-            match io_success {
-                Err(io_err) => {
-                    println!("Error reading input: {:?}", io_err);
-                }
-                _ => {}
-            }
-            conf_true = PathBuf::from(str_to_buf);
+            panic!("OS \"config\" location unknown. Exiting.");
         }
-    }
-    
-    let     trash_temp: Option<PathBuf> = dirs_next::home_dir();
-    let mut trash_true: PathBuf;
-    match trash_temp {
-        Some(buf) => {
-            trash_true = buf;
-            trash_true.push(".trash-rs");
+    };
+   
+    let trash = match dirs_next::home_dir() {
+        Some(mut buf) => {
+            buf.push(".trash-rs");
+            buf
         }
         None => {
-            println!("OS \"home\" locatpion unkown. Please specify a destination for removed files.");
-            let mut str_to_buf = String::new();
-            let read_result = io::stdin().read_line(&mut str_to_buf);
-            match read_result {
-                Err(io_err) => panic!("Failed to read input: {:?}", io_err),
-                _ => {}
-            }
-            trash_true = PathBuf::from(str_to_buf);
+            panic!("OS \"home\" location unknown. Exiting.");
+        }
+    };
+    
+    (conf, trash)
+}
+
+fn write_config(mut file: &File, config: &Config) {
+    let toml_as_str: String = toml::to_string(config).unwrap();
+    let bytes: &[u8] = (toml_as_str).as_bytes();
+    match file.write(bytes) {
+        Err(e) => {
+            println!("Error writing to configuration file: {:?}", e);
+        }
+        _ => {}
+    }
+}
+
+fn verify_trash_loc(mut trash_loc: PathBuf) -> PathBuf {    
+    print!("Where would you like the trash directory to be? ");
+    println!("Leave blank for the default locations:");
+    println!("Lin: ~/.trash-rs");
+    println!("\nWin: C:\\Users\\your_name\\.trash-rs");
+    println!("Mac: /Users/your_name/.trash-rs");
+          
+    let mut desired_dir: String = String::new();
+    match io::stdin().read_line(&mut desired_dir) {
+        Err(e) => {
+            println!("Error reading input: {:?}", e);
+        }
+        _ => {
+            if !desired_dir.is_empty() {
+                trash_loc = PathBuf::from(desired_dir);
+            } 
         }
     }
-    
-    (conf_true, trash_true)
+    match read_dir(&trash_loc) {
+        Err(e) => match e.kind() {
+            ErrorKind::NotFound => { panic!("Location given could not be found."); }
+            _ => { println!("Error while reading directory given: {:?}", e); }
+        } _ => {}
+    }
+    trash_loc
 }

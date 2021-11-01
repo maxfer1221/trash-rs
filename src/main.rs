@@ -1,6 +1,6 @@
 //use std::{str::FromStr, env, fs::{File, self}};
 //use std::{str::FromStr, env, fs};
-use std::{str::FromStr, env};
+use std::{str::FromStr, env, fs, io::ErrorKind};
 mod config;
 mod delete;
 
@@ -31,7 +31,20 @@ impl FromStr for Function {
 
 fn main() {
     let conf: config::Config = config::create_config();
-    
+    match fs::read_dir(&conf.trash_dir) {
+        Err(error) => {
+            match error.kind() {
+                ErrorKind::NotFound => match fs::create_dir(&conf.trash_dir) {
+                    Err(e) => {
+                        panic!("Problem creating trash directory: {:?}", e);
+                    } _ => {}
+                } other => {
+                    panic!("Problem reading trash directory: {:?}", other);
+                }
+            }
+        } _ => {}
+    }
+
     let args: &[String] = &env::args().collect::<Vec<String>>(); 
     let flags = args.iter().filter(|a| a.starts_with('-'))
         .cloned().collect::<Vec<String>>();
