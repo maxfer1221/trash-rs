@@ -56,10 +56,10 @@ fn main() {
     match function {
         Ok(Function::Delete) => {
             if help {
-                println!("Usage: trash-rs delete FILE\n  or:  trash-rs delete FILES...");
+                println!("Usage: trash-rs delete FILE\n  or:  trash-rs delete FILES...\n");
+                println!("Moves target FILE/S... to the trash directory as specified in the configuration file");
             } else {
-                let res = delete::delete_files(rest, &conf.trash_dir);
-                match res {
+                match delete::delete_files(rest, &conf.trash_dir) {
                     Err(e) => {
                         println!("{:?}", e);
                     }
@@ -68,23 +68,43 @@ fn main() {
             }
         }
         Ok(Function::List) => {
-            println!("List!");
+            if help {
+                println!("Usage: trash-rs list\n\nLists all files currently in the trash");
+            } else {
+                println!("List!");
+            }
         }
         Ok(Function::Empty) => {
-            println!("Empty!");
+            if help {
+                println!("Usage: trash-rs empty FILE\n  or:  trash-rs empty FILES...\n");
+                println!("Permanently deletes specified files currently in the trash");
+            } else {
+                println!("Empty!");
+            }
         }
         Ok(Function::ChangeDir(_)) => {
-            println!("Change dir!");
+            if help {
+                println!("Usage: trash-rs change-dir DIR\n\nChanges the target directory for trashed items");
+            } else {
+                println!("Change dir!");
+            }
         }
         Ok(Function::Restore(_)) => {
-            println!("Restore!");
+            if help {
+                println!("Usage: trash-rs restore FILE\n  or:  trash-rs restore FILES...\n");
+                println!("Restores files from the trashcan to their original directories (if possible)");
+            } else {
+                println!("Restore!");
+            }
         }
         Err(()) => {
             if help {
-                println!("help msg");
+                println!("manpage");
             } else {
-                println!("{} is not a function. do 'trash-rs --help' for more information.", args[1]);
+                println!("{} is not a function. 'trash-rs --help' for more information.", args[1]);
             }
+            let attr = fs::metadata("/home/maximo/Documents/trash-rs/src/main.rs").unwrap();
+            println!("{:?}", attr);
         }
     }
 
