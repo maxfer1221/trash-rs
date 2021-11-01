@@ -2,7 +2,8 @@
 //use std::{str::FromStr, env, fs};
 use std::{str::FromStr, env};
 mod config;
-//use delete;
+mod delete;
+
 
 #[derive(Debug, PartialEq)]
 enum Function {
@@ -29,13 +30,29 @@ impl FromStr for Function {
 }
 
 fn main() {
+    let conf: config::Config = config::create_config();
     
-    let args: &[String] = &env::args().collect::<Vec<String>>();
+    let args: &[String] = &env::args().collect::<Vec<String>>(); 
+    let flags = args.iter().filter(|a| a.starts_with('-'))
+        .cloned().collect::<Vec<String>>();
+    let rest  = args.iter().filter(|a| !a.starts_with('-'))
+        .cloned().collect::<Vec<String>>();
+    let help: bool = flags.iter().any(|f| f == "-h" || f == "--help");
     let function = Function::from_str(&args[1]);
-    
+
     match function {
         Ok(Function::Delete) => {
-            println!("Delete!");       
+            if help {
+                println!("Usage: trash-rs delete FILE\n  or:  trash-rs delete FILES...");
+            } else {
+                let res = delete::delete_files(rest, &conf.trash_dir);
+                match res {
+                    Err(e) => {
+                        println!("{:?}", e);
+                    }
+                    _ => {}
+                }
+            }
         }
         Ok(Function::List) => {
             println!("List!");
@@ -50,9 +67,12 @@ fn main() {
             println!("Restore!");
         }
         Err(()) => {
-            println!("{} is not a function.", args[1]);
+            if help {
+                println!("help msg");
+            } else {
+                println!("{} is not a function. do 'trash-rs --help' for more information.", args[1]);
+            }
         }
     }
 
-    config::create_config();
 }
