@@ -1,9 +1,9 @@
-// extern crate fs_extra;
-use std::str::FromStr;
-// use std::io;
-use std::env;
-// use fs_extra::dir::copy;
-//
+//use std::{str::FromStr, env, fs::{File, self}};
+//use std::{str::FromStr, env, fs};
+use std::{str::FromStr, env};
+mod config;
+//use delete;
+
 #[derive(Debug, PartialEq)]
 enum Function {
     Delete,
@@ -29,13 +29,10 @@ impl FromStr for Function {
 }
 
 fn main() {
-    let mut args: &[String] = &env::args().collect::<Vec<String>>();
-
-    //let mut err_str: String = args[1].clone();
-    //err_str.push_str(" is not a function.");
-
+    
+    let args: &[String] = &env::args().collect::<Vec<String>>();
     let function = Function::from_str(&args[1]);
-    // args = &args[2..];
+    
     match function {
         Ok(Function::Delete) => {
             println!("Delete!");       
@@ -56,5 +53,6 @@ fn main() {
             println!("{} is not a function.", args[1]);
         }
     }
-  
+
+    config::create_config();
 }
