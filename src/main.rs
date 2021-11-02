@@ -3,6 +3,7 @@
 use std::{str::FromStr, env, fs, io::ErrorKind};
 mod config;
 mod delete;
+mod list;
 
 
 #[derive(Debug, PartialEq)]
@@ -51,15 +52,13 @@ fn main() {
     let rest  = args.iter().filter(|a| !a.starts_with('-'))
         .cloned().collect::<Vec<String>>();
     let help: bool = flags.iter().any(|f| f == "-h" || f == "--help");
-    let function = Function::from_str(&args[1]);
-
-    match function {
+    match Function::from_str(&args[1]) {
         Ok(Function::Delete) => {
             if help {
                 println!("Usage: trash-rs delete FILE\n  or:  trash-rs delete FILES...\n");
                 println!("Moves target FILE/S... to the trash directory as specified in the configuration file");
             } else {
-                match delete::delete_files(rest, &conf.trash_dir) {
+                match delete::delete_files(rest, &conf) {
                     Err(e) => {
                         println!("{:?}", e);
                     }
@@ -71,7 +70,12 @@ fn main() {
             if help {
                 println!("Usage: trash-rs list\n\nLists all files currently in the trash");
             } else {
-                println!("List!");
+                match list::list_objects(rest, &conf) {
+                    Err(e) => {
+                        println!("{:?}", e);
+                    }
+                    _ => {}
+                }
             }
         }
         Ok(Function::Empty) => {
