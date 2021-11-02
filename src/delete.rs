@@ -15,7 +15,11 @@ pub fn delete_files(files: Vec<String>, config: &Config) -> std::io::Result<()> 
         // println!("{:?}", oname);
         // println!("{:?}", metadata(&oname).unwrap());
         rename(oname, fname)?;
+        
     }
     Ok(())
 }
 
+// fn write_metadata() -> Result<()> {
+//     let toml_as_str: String = toml::to_string()
+// }

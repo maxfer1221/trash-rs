@@ -9,3 +9,4 @@ edition = "2018"
 serde = {version = "1.0.130", features = ["derive"] }
 dirs-next = "2.0.0"
 toml = "0.5.8"
+humantime = "2.1.0"

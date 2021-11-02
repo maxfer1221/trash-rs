@@ -6,14 +6,17 @@ A trash-cli copy, but this time in Rust.
 - [x] Deletion
   - [x] Relative paths
   - [x] * functionality
-- [ ] List files
+  - [ ] External file to save original file locations
+- [x] List files
   - [ ] Include in Metadata:
     - [ ] Original directory
-    - [ ] Date deleted
-  - [ ] * functionality
+    - [x] Date deleted
 - [ ] Empty trash
   - [ ] * functionality
 - [ ] Change trash directory
   - [ ] Force create directory
 - [ ] File restoration
   - [ ] * functionality
+- [x] Clean configuration file
+  - [x] Reset directory location 
+  - [x] Create missing directories

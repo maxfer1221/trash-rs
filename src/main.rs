@@ -13,6 +13,7 @@ enum Function {
     Empty,
     ChangeDir(Option<String>),
     Restore(Option<Box<[String]>>),
+    Clean,
 }
 
 impl FromStr for Function {
@@ -24,40 +25,30 @@ impl FromStr for Function {
             "list"       => Ok(Function::List),
             "empty"      => Ok(Function::Empty),
             "change-dir" => Ok(Function::ChangeDir(None)),
-            "Restore"    => Ok(Function::Restore(None)),
+            "restore"    => Ok(Function::Restore(None)),
+            "clean"     => Ok(Function::Clean),
             _            => Err(()),
         }
     }
 }
 
 fn main() {
-    let conf: config::Config = config::create_config();
-    match fs::read_dir(&conf.trash_dir) {
-        Err(error) => {
-            match error.kind() {
-                ErrorKind::NotFound => match fs::create_dir(&conf.trash_dir) {
-                    Err(e) => {
-                        panic!("Problem creating trash directory: {:?}", e);
-                    } _ => {}
-                } other => {
-                    panic!("Problem reading trash directory: {:?}", other);
-                }
-            }
-        } _ => {}
-    }
-
     let args: &[String] = &env::args().collect::<Vec<String>>(); 
     let flags = args.iter().filter(|a| a.starts_with('-'))
         .cloned().collect::<Vec<String>>();
     let rest  = args.iter().filter(|a| !a.starts_with('-'))
         .cloned().collect::<Vec<String>>();
     let help: bool = flags.iter().any(|f| f == "-h" || f == "--help");
+
+    let conf: config::Config;
+
     match Function::from_str(&args[1]) {
         Ok(Function::Delete) => {
             if help {
                 println!("Usage: trash-rs delete FILE\n  or:  trash-rs delete FILES...\n");
                 println!("Moves target FILE/S... to the trash directory as specified in the configuration file");
             } else {
+                conf = fetch_config();
                 match delete::delete_files(rest, &conf) {
                     Err(e) => {
                         println!("{:?}", e);
@@ -70,6 +61,7 @@ fn main() {
             if help {
                 println!("Usage: trash-rs list\n\nLists all files currently in the trash");
             } else {
+                conf = fetch_config();
                 match list::list_objects(rest, &conf) {
                     Err(e) => {
                         println!("{:?}", e);
@@ -83,6 +75,7 @@ fn main() {
                 println!("Usage: trash-rs empty FILE\n  or:  trash-rs empty FILES...\n");
                 println!("Permanently deletes specified files currently in the trash");
             } else {
+                conf = fetch_config();
                 println!("Empty!");
             }
         }
@@ -90,6 +83,7 @@ fn main() {
             if help {
                 println!("Usage: trash-rs change-dir DIR\n\nChanges the target directory for trashed items");
             } else {
+                conf = fetch_config();
                 println!("Change dir!");
             }
         }
@@ -98,18 +92,43 @@ fn main() {
                 println!("Usage: trash-rs restore FILE\n  or:  trash-rs restore FILES...\n");
                 println!("Restores files from the trashcan to their original directories (if possible)");
             } else {
+                conf = fetch_config();
                 println!("Restore!");
+            }
+        },
+        Ok(Function::Clean) => {
+            if help {
+                println!("Usage: trash-rs clean\n\nCreates (overwrites) configuration file");
+            } else {
+                config::create_config_file(&config::find_conf());
             }
         }
         Err(()) => {
             if help {
                 println!("manpage");
             } else {
-                println!("{} is not a function. 'trash-rs --help' for more information.", args[1]);
+                println!("'{}' is not a function. Do 'trash-rs --help' for more information", args[1]);
             }
-            let attr = fs::metadata("/home/maximo/Documents/trash-rs/src/main.rs").unwrap();
-            println!("{:?}", attr);
         }
     }
+}
 
+fn fetch_config() -> config::Config {
+    let conf: config::Config = config::fetch_config();
+    match fs::read_dir(&conf.trash_dir) {
+        Err(error) => {
+            match error.kind() {
+                ErrorKind::NotFound => match fs::create_dir(&conf.trash_dir) {
+                    Err(e) => {
+                        println!("Problem creating trash directory: {:?}", e);
+                        std::process::exit(1);
+                    } _ => {}
+                } other => {
+                    println!("Problem reading trash directory: {:?}", other);
+                    std::process::exit(1);
+                }
+            }
+        } _ => {}
+    }
+    conf
 }
