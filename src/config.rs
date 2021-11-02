@@ -109,17 +109,11 @@ pub fn create_config_file(loc: &PathBuf) -> (File, Config) {
     };
 
     let master_dir: PathBuf = create_master_dir();
-    (conf_file, create_trash_directories(master_dir))
-}
+    let config = Config::new(&master_dir);
 
-fn create_trash_directories(master_dir: PathBuf) -> Config {
-    let mut trash_loc = master_dir.clone();
-    trash_loc.push("files");
+    write_config(&conf_file, &config);
 
-    let mut trash_info = master_dir.clone();
-    trash_info.push("info");
-
-    Config::new(&master_dir)
+    (conf_file, config)
 }
 
 fn create_master_dir() -> PathBuf {
