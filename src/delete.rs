@@ -1,6 +1,7 @@
-use std::{fs::rename, ffi::OsStr, path::PathBuf, env};
+use std::{fs::rename, ffi::OsStr, path::PathBuf, env, time::SystemTime};
 use crate::config::Config;
 use crate::trash::trash_contains;
+use humantime;
 
 trait Rename {
     fn is_copy_obj(&self, config: &Config) -> bool;
@@ -15,7 +16,7 @@ impl Rename for PathBuf {
         self
     }
 
-    fn is_copy_obj(&self, config: &Config) -> bool {  
+    fn is_copy_obj(&self, config: &Config) -> bool {
         let ext: String = match self.extension() {
             Some(s) => match s.to_os_string().into_string() {
                 Ok(s) => s,
@@ -24,6 +25,11 @@ impl Rename for PathBuf {
             _ => "".into(),
         };
 
+        if ext.eq("") {
+            return false
+        }
+        
+        println!("{} {}", config.copy_ext, &ext);
         if &ext[..(config.copy_ext.len())] == config.copy_ext {
             return true
         } false
@@ -32,18 +38,17 @@ impl Rename for PathBuf {
 
 pub fn delete_files(files: Vec<String>, config: &Config) -> std::io::Result<()> {
     for file in files.iter().skip(2) {
-        let result  = delete_file(file, &config);
-        match result {
+        match delete_file(file, &config) {
             Err(e) => {
                 println!("Error moving file: {:?}", e);
             },
-            _ => {},
+            Ok(o, f) => write_metadata(o, f),
         }
     }
     Ok(())
 }
 
-fn delete_file(file: &String, config: &Config) -> std::io::Result<()> { 
+fn delete_file(file: &String, config: &Config) -> std::io::Result<(PathBuf, PathBuf)> { 
     let mut oname: PathBuf; 
     let mut fname: PathBuf;
     let temp_buf: PathBuf;
@@ -79,9 +84,19 @@ fn delete_file(file: &String, config: &Config) -> std::io::Result<()> {
     oname = env::current_dir().unwrap();
     oname.push(file);
 
-    rename(oname, fname) 
+    match rename(oname, fname) {
+        Ok(_) => return Ok((oname, fname)),
+        Err(e) => Err(e),
+    }
 }
 
-// fn write_metadata() -> Result<()> {
-//     let toml_as_str: String = toml::to_string()
-// }
+fn write_metadata(o: PathBuf, f: PathBuf) -> std::io::Result<> {
+    let t: SystemTime = std::time::now();
+    let mut s: String = humantime::format_rfc3339_seconds(t).to_string()
+                            .replace("T", " ");
+    s.pop();
+
+    let tf: TrashFile = trash::TrashFile { path: o, date: s };
+    let toml_as_str: String = toml::to_string(tf);
+    printf!("{}", toml_as_str);
+}

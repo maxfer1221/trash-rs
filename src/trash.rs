@@ -21,7 +21,9 @@ struct TrashCopies {
     copies: u64,
 }
 
+
 fn read_file(file: PathBuf) -> String {
+    println!("{:?}", file);
     match File::open(file) {
         Err(e) => match e.kind() {
             ErrorKind::NotFound => {
@@ -58,21 +60,20 @@ pub fn trash_contains(file_name: &OsStr, master: &PathBuf) -> (bool, u64) {
     md.push("metadata");
     md.set_extension("info");
 
-    let metadata: String = read_file(master.clone());
+    let metadata: String = read_file(md);
+    if metadata.is_empty() {
+        return (false, 0);
+    }
     let th: TrashHandler = match toml::from_str(metadata.as_str()) {
         Err(e) => {
+            println!("{:?}", e);
             println!("Unable to deserialize trash metadata. Exiting");
             std::process::exit(1);
         } Ok(t) => t,
     };
 
-    let fname: String = match file_name.to_os_string().into_string() {
-        Ok(s) => s,
-        Err(e) => String::new(),
-    };
-
     for file in th.files {
-        if file.name.eq(&fname) {
+        if file.name.eq(&s) {
                 return (true, file.copies)
         }
     }

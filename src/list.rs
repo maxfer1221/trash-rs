@@ -23,10 +23,6 @@ pub fn list_objects(_extra: Vec<String>, config: &Config) -> std::io::Result<()>
         let mod_date: String = match metadata {
             Ok(m) => match m.modified() {
                 Ok(t) => {
-                    let mut s = humantime::format_rfc3339_seconds(t).to_string()
-                                .replace("T", " ");
-                    s.pop();
-                    s
                 },
                 _ => String::from("NaN"),
             },  _ => String::from("NaN"),

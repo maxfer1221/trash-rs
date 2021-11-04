@@ -75,7 +75,7 @@ fn main() {
                 println!("Usage: trash-rs empty FILE\n  or:  trash-rs empty FILES...\n");
                 println!("Permanently deletes specified files currently in the trash");
             } else {
-                conf = fetch_config();
+                // conf = fetch_config();
                 println!("Empty!");
             }
         }
@@ -83,7 +83,7 @@ fn main() {
             if help {
                 println!("Usage: trash-rs change-dir DIR\n\nChanges the target directory for trashed items");
             } else {
-                conf = fetch_config();
+                // conf = fetch_config();
                 println!("Change dir!");
             }
         }
@@ -92,24 +92,27 @@ fn main() {
                 println!("Usage: trash-rs restore FILE\n  or:  trash-rs restore FILES...\n");
                 println!("Restores files from the trashcan to their original directories (if possible)");
             } else {
-                conf = fetch_config();
+                // conf = fetch_config();
                 println!("Restore!");
             }
         },
         Ok(Function::Clean) => {
+            let help_str: String = format!("{}\n{}\n{}\n{}",
+                "Usage: trash-rs clean FLAGS\n\nCreates (overwrites) configuration file or trash directories",
+                "FLAGS:\n  -c        Recreate configuration file",
+                "  -d        Recreate trash directories",
+                "  -cd  -dc  Recreate configuration file and trash directories");
             if help {
-                println!("Usage: trash-rs clean FLAGS\n\nCreates (overwrites) configuration file or trash directories");
-                println!("FLAGS:\n\t-c\tRecreate configuration file");
-                println!("      \t-d\tRecreate trash directories");
-                println!("      \t-cd  -dc\tRecreate configuration file and trash directories");
+                println!("{}", help_str);
             } else {
+                println!("{:?}", flags);
                 if flags.iter().any(|f| f.contains("c")) {
+                    println!("here");
                     config::create_config_file(&config::find_conf());
-                }
-                if flags.iter().any(|f| f.contains("d")) {
+                } else if flags.iter().any(|f| f.contains("d")) {
                     config::create_master_dir();
                 } else {
-                    println!("Usage: trash-rs clean FLAGS\n\nCreates (overwrites) configuration file or trash directories");
+                    println!("{}", help_str);
                 }
             }
         },

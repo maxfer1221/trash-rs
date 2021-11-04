@@ -7,8 +7,8 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
-    pub dirs: Directories,
     pub copy_ext: String,
+    pub dirs: Directories,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -25,12 +25,12 @@ impl Config {
         tp.push("files");
         ti.push("info");
         Config {
+            copy_ext: String::from("copy"),
             dirs: Directories {
                 master_dir: master_dir.clone(),
                 trash_dir: tp,
                 trash_info: ti,
             },
-            copy_ext: String::from("copy"),
         }
     }
 }
@@ -50,6 +50,7 @@ pub fn fetch_config() -> Config {
 
                 if parse_yn() {
                     let (file, config) = create_config_file(&conf_loc);
+                    println!("{:?}", &config);
                     write_config(&file, &config);
                     config
                 } else {
@@ -82,7 +83,14 @@ pub fn fetch_config() -> Config {
 }
 
 fn write_config(mut file: &File, config: &Config) {
-    let toml_as_str: String = toml::to_string(config).unwrap();
+    println!("{:?}", config);
+    let toml_as_str: String = match toml::to_string(config) {
+        Ok(s) => s,
+        Err(e) => {
+            panic!("Serializing error: {:?}", e);
+            std::process::exit(1);
+        }
+    };
     let bytes: &[u8] = (toml_as_str).as_bytes();
     match file.write(bytes) {
         Err(e) => {
@@ -120,6 +128,8 @@ pub fn create_config_file(loc: &PathBuf) -> (File, Config) {
     println!("Create trash directories again? WARNING: will overwrite old directories (y/n)");
     let master_dir: PathBuf = create_master_dir();
     let config = Config::new(&master_dir);
+
+    println!("{:?}", &config);
 
     write_config(&conf_file, &config);
 
@@ -176,6 +186,8 @@ pub fn create_master_dir() -> PathBuf {
 }
 
 fn create_directories(md: &PathBuf) {
+    println!("{:?}", md);
+
     let mut tp = md.clone();
     tp.push("files");
     let mut ti = md.clone();
