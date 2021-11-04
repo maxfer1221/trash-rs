@@ -1,16 +1,17 @@
-use std::{ffi::OsStr, path::{Path, PathBuf}, env, time::SystemTime};
+use std::{ffi::OsStr, path::PathBuf, env, time::SystemTime};
 use std::fs::{self, rename, File};
-use std::io::{Read, BufReader};
+use std::io::{Error, Read, BufReader};
 use crate::config::Config;
 use crate::trash::{TrashFile, TrashCopies, TrashHandler, trash_contains};
 use humantime;
 
-trait Rename {
+trait BufUtil {
     fn is_copy_obj(&self, config: &Config) -> bool;
     fn rename_dup(self, copy_ext: &String, file_count: u64) -> PathBuf;
+    fn get_full_stem(&self, c: &Config) -> Result<PathBuf, Error>;
 }
 
-impl Rename for PathBuf {
+impl BufUtil for PathBuf {
     fn rename_dup(mut self, copy_ext: &String, file_count: u64) -> PathBuf {
         self.set_extension(
             format!("{}{}", copy_ext, file_count)
@@ -36,21 +37,39 @@ impl Rename for PathBuf {
             return true
         } false
     }
+
+    fn get_full_stem(&self, c: &Config) -> Result<PathBuf, Error> {
+        let mut parent: PathBuf = match self.parent() {
+            Some(p) => p.to_path_buf(),
+            _ => PathBuf::new(),
+        };
+
+        if self.is_copy_obj(c) {
+            let stem: PathBuf = match self.file_stem() {
+                Some(s) => PathBuf::from(s),
+                _ => PathBuf::new(),
+            };
+            parent.push(stem);
+            return Ok(parent.to_path_buf());
+        }
+        let stem: PathBuf = match self.file_name() {
+            Some(d) => PathBuf::from(d),
+            _ => PathBuf::new(),
+        };
+        parent.push(stem);
+        Ok(parent.to_path_buf())
+    }
 }
 
-pub fn delete_files(files: Vec<String>, config: &Config) -> std::io::Result<()> {
+pub fn delete_files(files: Vec<String>, config: &Config) -> Result<(), Error> {
     for file in files.iter().skip(2) {
-        match delete_file(file, &config) {
-            Err(e) => {
-                println!("Error moving file: {:?}", e);
-            },
-            Ok((o, f)) => write_metadata(&o, &f, &config),
-        }
+        let (o, f): (PathBuf, PathBuf) = delete_file(file, &config)?;
+        write_metadata(&o, &f, &config)?;
     }
     Ok(())
 }
 
-fn delete_file(file: &String, config: &Config) -> std::io::Result<(PathBuf, PathBuf)> { 
+fn delete_file(file: &String, config: &Config) -> Result<(PathBuf, PathBuf), Error> { 
     let mut oname: PathBuf; 
     let mut fname: PathBuf;
     let temp_buf: PathBuf;
@@ -60,22 +79,17 @@ fn delete_file(file: &String, config: &Config) -> std::io::Result<(PathBuf, Path
     fname.push(temp_buf.file_name().unwrap());
     
     if fname.is_copy_obj(config) {
-        fname = match fname.clone().file_name() {
-            Some(n) => {
-                fname.rename_dup(
-                    &config.copy_ext, 
-                    trash_contains(n, &config.dirs.master_dir).1)
-            },
-            None => PathBuf::new().rename_dup(
-                &config.copy_ext, trash_contains(
-                    OsStr::new(""), &config.dirs.trash_info).1),
-        };
+        let n = fname.clone();
+        let index: u64 = trash_contains(match n.file_name() {
+            Some(n) => n,
+            _ => OsStr::new(""),
+        }, &config.dirs.master_dir).1;
+        fname = fname.rename_dup(&config.copy_ext, index);
     } else {
-        let (tc, c): (bool, u64) = trash_contains(
-            match fname.file_name(){
-                Some(n) => n,
-                None => OsStr::new(""),
-            }, &config.dirs.master_dir);
+        let (tc, c): (bool, u64) = trash_contains(match fname.file_name() {
+            Some(n) => n,
+            _ => OsStr::new(""),
+        }, &config.dirs.master_dir);
 
         fname = match tc {
             true => fname.rename_dup(&config.copy_ext, c),
@@ -83,7 +97,7 @@ fn delete_file(file: &String, config: &Config) -> std::io::Result<(PathBuf, Path
         };
     }
 
-    oname = env::current_dir().unwrap();
+    oname = env::current_dir()?;
     oname.push(file);
 
     match rename(oname.clone(), fname.clone()) {
@@ -92,41 +106,52 @@ fn delete_file(file: &String, config: &Config) -> std::io::Result<(PathBuf, Path
     }
 }
 
-fn write_metadata(o: &PathBuf, f: &PathBuf, c: &Config) /*-> std::io::Result<std::io::Error>*/ {
+fn write_metadata(o: &PathBuf, f: &PathBuf, c: &Config) -> Result<(), Error> {
     let t: SystemTime = SystemTime::now();
     let mut time_as_string: String = humantime::format_rfc3339_seconds(t)
                                         .to_string().replace("T", " ");
     time_as_string.pop();
 
     let tf: TrashFile = TrashFile::new(&o, &time_as_string);
-    match toml::to_string(&tf) {
-        Ok(s) => {
-            let mut final_file: PathBuf = f.clone();
-            final_file.set_extension(
-                format!("{}.{}", 
-                match final_file.extension() {
-                    Some(ext) => match ext.to_os_string().into_string() {
-                        Ok(s) => s,
-                        Err(e) => {
-                            println!("Could not resolve file extension: {:?}", e);
-                            std::process::exit(1);
-                        },
-                    },
-                    None => {
-                        println!("Could not resolve file extension");
-                        std::process::exit(1);
-                    }
-                }, "info"));
-            let bytes: &[u8] = s.as_bytes();
-            match fs::write(final_file, bytes) {
-                Err(e) => {
-                    println!("Error writing to metadata file: {:?}", e);
-                    std::process::exit(1);
-                }, _ => {}
+    let toml_as_string: String = match toml::to_string(&tf) {
+        Ok(s) => s,
+        Err(e) => {
+            println!("Could not serialize metadata: {:?}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let mut final_file: PathBuf = c.dirs.trash_info.clone();
+    final_file.push(match f.file_name() {
+        Some(n) => match n.to_os_string().into_string() {
+            Ok(s) => s,
+            Err(os) => {
+                println!("Could not convert OsString: {:?}", os);
+                std::process::exit(1);
             }
-        } 
-        Err(_e) => {},
+        },
+        _ => String::new(),
+    });
+    
+    let final_ext: String = match final_file.extension() {
+        Some(ext) => match ext.to_os_string().into_string() {
+            Ok(s) => s,
+            Err(e) => {
+                println!("Could not resolve file extension: {:?}", e);
+                std::process::exit(1);
+            },
+        },
+        None => String::new(),
+    };
+
+    if !final_ext.is_empty() {
+        final_file.set_extension(format!("{}.{}", final_ext, "info"));
+    } else {
+        final_file.set_extension("info");
     }
+    
+    let bytes: &[u8] = toml_as_string.as_bytes();
+    fs::write(final_file, bytes)?;
 
     let mut fdir: PathBuf = c.dirs.master_dir.clone();
     fdir.push("metadata");
@@ -171,70 +196,18 @@ fn write_metadata(o: &PathBuf, f: &PathBuf, c: &Config) /*-> std::io::Result<std
                 std::process::exit(1);
             }
         };
-    }
+    } 
     
-    
-    let stem: PathBuf = match f.is_copy_obj(c) {
-        true => match f.file_stem() {
-            Some(s) => {
-                let r: &Path = match f.parent() {
-                    Some(d) => d,
-                    None => {
-                        println!("Could not resolve file parent");
-                        std::process::exit(1);
-                    },
-                };
-                let mut x: PathBuf = r.to_path_buf();
-                x.push(s);
-                x
-            },
-            None => {
-                let r: &Path = match f.parent() {
-                    Some(d) => d,
-                    None => {
-                        println!("Could not resolve parent path to metadata file");
-                        std::process::exit(1);
-                    },
-                };
-                let x: PathBuf = r.to_path_buf();
-                x
-            }
-        },
-        false => match f.file_name() {
-            Some(s) => { 
-                let r: &Path = match f.parent() {
-                    Some(d) => d,
-                    None => {
-                        println!("Could not resolve file parent");
-                        std::process::exit(1);
-                    },
-                };
-                let mut x: PathBuf = r.to_path_buf();
-                x.push(s);
-                x
-            },
-            None => {
-                let r: &Path = match f.parent() {
-                    Some(d) => d,
-                    None => {
-                        println!("Could not resolve file name");
-                        std::process::exit(1);
-                    },
-                };
-                let x: PathBuf = r.to_path_buf();
-                x
-            }
-        },
-    };
+    let stem: PathBuf = f.get_full_stem(c)?;
 
     let mut present: bool = false;
     for mut file in &mut th.files {
         let fstr: String = match stem.clone().into_os_string().into_string() {
-            Ok(s) => s.clone(),
-            Err(e) => {
-                println!("Could not resolve stem: {:?}", e);
+            Ok(s) => s,
+            Err(s) => {
+                println!("Could not convert file to string: {:?}", s);
                 std::process::exit(1);
-            }
+            },
         };
         if fstr.eq(&file.name) {
             file.copies += 1;
@@ -257,7 +230,7 @@ fn write_metadata(o: &PathBuf, f: &PathBuf, c: &Config) /*-> std::io::Result<std
         Err(e) => {
             println!("Couldn't write to metadata file: {:?}", e);
             std::process::exit(1);
-        } _ => {}
+        } _ => Ok(())
     }
     // Ok(())
 }
