@@ -5,22 +5,45 @@ use toml;
 
     
 #[derive(Serialize, Deserialize)]
-struct TrashFile {
+pub struct TrashFile {
     path: PathBuf,
     date: String,
 }
 
-#[derive(Serialize, Deserialize)]
-struct TrashHandler {
-    files: Vec<TrashCopies>,
+impl TrashFile {
+    pub fn new(p: &PathBuf, d: &String) -> TrashFile {
+        TrashFile { path: p.clone(), date: d.clone() }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
-struct TrashCopies {
-    name: String,
-    copies: u64,
+pub struct TrashHandler {
+    pub files: Vec<TrashCopies>,
 }
 
+impl TrashHandler {
+    pub fn new() -> TrashHandler {
+        TrashHandler { files: Vec::new() }
+    }
+    pub fn push(&mut self, tc: TrashCopies) {
+        self.files.push(tc);
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TrashCopies {
+    pub name: String,
+    pub copies: u64,
+}
+
+impl TrashCopies {
+    pub fn new(n: String) -> TrashCopies {
+        TrashCopies {
+            name: n,
+            copies: 0,
+        }
+    }
+}
 
 fn read_file(file: PathBuf) -> String {
     println!("{:?}", file);

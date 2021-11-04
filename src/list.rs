@@ -1,7 +1,7 @@
 use std::{io, fs};
 // use std::time::SystemTime;
 use crate::config::Config;
-use humantime;
+// use humantime;
 
 pub fn list_objects(_extra: Vec<String>, config: &Config) -> std::io::Result<()> {
     let files = fs::read_dir(&config.dirs.trash_dir)?
@@ -22,7 +22,8 @@ pub fn list_objects(_extra: Vec<String>, config: &Config) -> std::io::Result<()>
         };
         let mod_date: String = match metadata {
             Ok(m) => match m.modified() {
-                Ok(t) => {
+                Ok(_t) => {
+                    String::new()
                 },
                 _ => String::from("NaN"),
             },  _ => String::from("NaN"),

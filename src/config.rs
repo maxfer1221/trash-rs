@@ -87,7 +87,7 @@ fn write_config(mut file: &File, config: &Config) {
     let toml_as_str: String = match toml::to_string(config) {
         Ok(s) => s,
         Err(e) => {
-            panic!("Serializing error: {:?}", e);
+            println!("Serializing error: {:?}", e);
             std::process::exit(1);
         }
     };
@@ -136,7 +136,7 @@ pub fn create_config_file(loc: &PathBuf) -> (File, Config) {
     (conf_file, config)
 }
 
-pub fn recreate_master_dir() {}
+// pub fn recreate_master_dir() {}
 
 pub fn create_master_dir() -> PathBuf {
     let mut master_dir: PathBuf;
