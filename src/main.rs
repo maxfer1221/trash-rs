@@ -4,7 +4,7 @@ use std::{str::FromStr, env, fs, io::ErrorKind};
 mod config;
 mod delete;
 mod list;
-
+mod trash;
 
 #[derive(Debug, PartialEq)]
 enum Function {
@@ -98,11 +98,21 @@ fn main() {
         },
         Ok(Function::Clean) => {
             if help {
-                println!("Usage: trash-rs clean\n\nCreates (overwrites) configuration file");
+                println!("Usage: trash-rs clean FLAGS\n\nCreates (overwrites) configuration file or trash directories");
+                println!("FLAGS:\n\t-c\tRecreate configuration file");
+                println!("      \t-d\tRecreate trash directories");
+                println!("      \t-cd  -dc\tRecreate configuration file and trash directories");
             } else {
-                config::create_config_file(&config::find_conf());
+                if flags.iter().any(|f| f.contains("c")) {
+                    config::create_config_file(&config::find_conf());
+                }
+                if flags.iter().any(|f| f.contains("d")) {
+                    config::create_master_dir();
+                } else {
+                    println!("Usage: trash-rs clean FLAGS\n\nCreates (overwrites) configuration file or trash directories");
+                }
             }
-        }
+        },
         Err(()) => {
             if help {
                 println!("manpage");
@@ -115,10 +125,10 @@ fn main() {
 
 fn fetch_config() -> config::Config {
     let conf: config::Config = config::fetch_config();
-    match fs::read_dir(&conf.trash_dir) {
+    match fs::read_dir(&conf.dirs.trash_dir) {
         Err(error) => {
             match error.kind() {
-                ErrorKind::NotFound => match fs::create_dir(&conf.trash_dir) {
+                ErrorKind::NotFound => match fs::create_dir(&conf.dirs.trash_dir) {
                     Err(e) => {
                         println!("Problem creating trash directory: {:?}", e);
                         std::process::exit(1);

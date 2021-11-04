@@ -7,6 +7,12 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
+    pub dirs: Directories,
+    pub copy_ext: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Directories {    
     pub master_dir: PathBuf,
     pub trash_dir: PathBuf,
     pub trash_info: PathBuf,
@@ -19,15 +25,18 @@ impl Config {
         tp.push("files");
         ti.push("info");
         Config {
-            master_dir: master_dir.clone(),
-            trash_dir: tp,
-            trash_info: ti,
+            dirs: Directories {
+                master_dir: master_dir.clone(),
+                trash_dir: tp,
+                trash_info: ti,
+            },
+            copy_ext: String::from("copy"),
         }
     }
 }
 
 pub fn fetch_config() -> Config {
-    let conf_loc: PathBuf  = find_conf();
+    let conf_loc: PathBuf = find_conf();
 
     match File::open(&conf_loc) {
         Err(error) => match error.kind() {
@@ -108,6 +117,7 @@ pub fn create_config_file(loc: &PathBuf) -> (File, Config) {
         Ok(file) => file
     };
 
+    println!("Create trash directories again? WARNING: will overwrite old directories (y/n)");
     let master_dir: PathBuf = create_master_dir();
     let config = Config::new(&master_dir);
 
@@ -116,7 +126,9 @@ pub fn create_config_file(loc: &PathBuf) -> (File, Config) {
     (conf_file, config)
 }
 
-fn create_master_dir() -> PathBuf {
+pub fn recreate_master_dir() {}
+
+pub fn create_master_dir() -> PathBuf {
     let mut master_dir: PathBuf;
 
     print!("Where would you like the trash directory to be? ");
@@ -168,7 +180,10 @@ fn create_directories(md: &PathBuf) {
     tp.push("files");
     let mut ti = md.clone();
     ti.push("info");
-   
+    let mut meta = md.clone();
+    meta.push("metadata");
+    meta.set_extension("info");
+
     match fs::create_dir_all(tp) {
         Err(e) => {
             println!("Error while creating directory: {:?}", e);
@@ -181,6 +196,13 @@ fn create_directories(md: &PathBuf) {
             println!("Error while creating directory: {:?}", e);
             std::process::exit(1);
         } _ => {}
+    }
+
+    match File::create(meta) {
+        Err(e) => {
+            println!("Error while creating trash files: {:?}", e);
+            std::process::exit(1);
+        } _ => {},
     }
 }
 

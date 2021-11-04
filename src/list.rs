@@ -4,7 +4,7 @@ use crate::config::Config;
 use humantime;
 
 pub fn list_objects(_extra: Vec<String>, config: &Config) -> std::io::Result<()> {
-    let files = fs::read_dir(&config.trash_dir)?
+    let files = fs::read_dir(&config.dirs.trash_dir)?
         .collect::<Result<Vec<_>, io::Error>>()?;
   
     println!("{0: <10}\t{1: <10}\t\t{2: <10}",
