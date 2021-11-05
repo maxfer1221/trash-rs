@@ -4,7 +4,7 @@ use std::io::{BufReader, ErrorKind, prelude::*};
 use toml;
 
     
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TrashFile {
     path: PathBuf,
     date: String,
@@ -16,7 +16,7 @@ impl TrashFile {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TrashHandler {
     pub files: Vec<TrashCopies>,
 }
@@ -30,7 +30,7 @@ impl TrashHandler {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TrashCopies {
     pub name: String,
     pub copies: u64,
@@ -84,12 +84,12 @@ pub fn trash_contains(file_name: &OsStr, master: &PathBuf) -> (bool, u64) {
     md.set_extension("info");
 
     let metadata: String = read_file(md);
-    if metadata.is_empty() {
+    if metadata.is_empty() || metadata.eq("\n") || metadata.eq("\\n") {
         return (false, 0);
     }
     let th: TrashHandler = match toml::from_str(metadata.as_str()) {
         Err(e) => {
-            println!("{:?}", e);
+            println!("Error here: {:?}", e);
             println!("Unable to deserialize trash metadata. Exiting");
             std::process::exit(1);
         } Ok(t) => t,

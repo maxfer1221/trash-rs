@@ -1,6 +1,6 @@
 //use std::{str::FromStr, env, fs::{File, self}};
 //use std::{str::FromStr, env, fs};
-use std::{str::FromStr, env, fs, io::ErrorKind};
+use std::{str::FromStr, env, fs, path::PathBuf, io::{Error, ErrorKind}};
 mod config;
 mod delete;
 mod list;
@@ -42,13 +42,24 @@ fn main() {
 
     let conf: config::Config;
 
+    if args.len() == 1 {
+        println!("Please provide a function. Do 'trash-rs -h' for more information");
+        std::process::exit(1);
+    }
+
     match Function::from_str(&args[1]) {
         Ok(Function::Delete) => {
             if help {
                 println!("Usage: trash-rs delete FILE\n  or:  trash-rs delete FILES...\n");
                 println!("Moves target FILE/S... to the trash directory as specified in the configuration file");
             } else {
-                conf = fetch_config();
+                conf = match fetch_config() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        println!("Error fetching configuration file: {:?}", e);
+                        std::process::exit(1);
+                    }
+                };
                 match delete::delete_files(rest, &conf) {
                     Err(e) => {
                         println!("{:?}", e);
@@ -61,7 +72,13 @@ fn main() {
             if help {
                 println!("Usage: trash-rs list\n\nLists all files currently in the trash");
             } else {
-                conf = fetch_config();
+                conf = match fetch_config() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        println!("Error fetching configuration file: {:?}", e);
+                        std::process::exit(1);
+                    }
+                };
                 match list::list_objects(rest, &conf) {
                     Err(e) => {
                         println!("{:?}", e);
@@ -106,11 +123,28 @@ fn main() {
                 println!("{}", help_str);
             } else {
                 println!("{:?}", flags);
-                if flags.iter().any(|f| f.contains("c")) {
-                    println!("here");
-                    config::create_config_file(&config::find_conf());
-                } else if flags.iter().any(|f| f.contains("d")) {
-                    config::create_master_dir();
+                if flags.iter().any(|f| f.contains("c") || f.contains("d")) {
+                    if flags.iter().any(|f| f.contains("c")) {
+                        let cd: PathBuf = match config::find_conf() {
+                            Ok(d) => d,
+                            Err(e) => {
+                                println!("Error finding configuration directory: {:?}", e);
+                                std::process::exit(1);
+                            }
+                        };
+                        match config::create_config_file(&cd) {
+                            Ok(c) => c,
+                            Err(e) => {
+                                println!("Error creating configuration file: {:?}", e);
+                                std::process::exit(1);
+                            }
+                        };
+                    }
+                    if flags.iter().any(|f| f.contains("d")) {
+                        if let Err(e) = config::create_master_dir() {
+                            println!("Error creating directories: {:?}", e);
+                        };
+                    }
                 } else {
                     println!("{}", help_str);
                 }
@@ -126,8 +160,8 @@ fn main() {
     }
 }
 
-fn fetch_config() -> config::Config {
-    let conf: config::Config = config::fetch_config();
+fn fetch_config() -> Result<config::Config, Error> {
+    let conf: config::Config = config::fetch_config()?;
     match fs::read_dir(&conf.dirs.trash_dir) {
         Err(error) => {
             match error.kind() {
@@ -143,5 +177,5 @@ fn fetch_config() -> config::Config {
             }
         } _ => {}
     }
-    conf
+    Ok(conf)
 }

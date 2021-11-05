@@ -65,6 +65,7 @@ pub fn delete_files(files: Vec<String>, config: &Config) -> Result<(), Error> {
     for file in files.iter().skip(2) {
         let (o, f): (PathBuf, PathBuf) = delete_file(file, &config)?;
         write_metadata(&o, &f, &config)?;
+        write_master_metadata(&f, &config)?;
     }
     Ok(())
 }
@@ -83,7 +84,7 @@ fn delete_file(file: &String, config: &Config) -> Result<(PathBuf, PathBuf), Err
         let index: u64 = trash_contains(match n.file_name() {
             Some(n) => n,
             _ => OsStr::new(""),
-        }, &config.dirs.master_dir).1;
+        }, &config.dirs.master_dir).1 + 1;
         fname = fname.rename_dup(&config.copy_ext, index);
     } else {
         let (tc, c): (bool, u64) = trash_contains(match fname.file_name() {
@@ -92,7 +93,7 @@ fn delete_file(file: &String, config: &Config) -> Result<(PathBuf, PathBuf), Err
         }, &config.dirs.master_dir);
 
         fname = match tc {
-            true => fname.rename_dup(&config.copy_ext, c),
+            true => fname.rename_dup(&config.copy_ext, c + 1),
             false => fname,
         };
     }
@@ -102,7 +103,10 @@ fn delete_file(file: &String, config: &Config) -> Result<(PathBuf, PathBuf), Err
 
     match rename(oname.clone(), fname.clone()) {
         Ok(_) => return Ok((oname, fname)),
-        Err(e) => Err(e),
+        Err(e) => {
+            println!("fname={:?}, oname={:?}", oname, fname);
+            return Err(e);
+        }
     }
 }
 
@@ -153,6 +157,10 @@ fn write_metadata(o: &PathBuf, f: &PathBuf, c: &Config) -> Result<(), Error> {
     let bytes: &[u8] = toml_as_string.as_bytes();
     fs::write(final_file, bytes)?;
 
+    Ok(())
+}
+
+fn write_master_metadata(f: &PathBuf, c: &Config) -> Result<(), Error> {
     let mut fdir: PathBuf = c.dirs.master_dir.clone();
     fdir.push("metadata");
     fdir.set_extension("info");
@@ -202,6 +210,7 @@ fn write_metadata(o: &PathBuf, f: &PathBuf, c: &Config) -> Result<(), Error> {
 
     let mut present: bool = false;
     for mut file in &mut th.files {
+        println!("{:?}", file);
         let fstr: String = match stem.clone().into_os_string().into_string() {
             Ok(s) => s,
             Err(s) => {
@@ -226,11 +235,6 @@ fn write_metadata(o: &PathBuf, f: &PathBuf, c: &Config) -> Result<(), Error> {
         },
     };
     let bytes = pre_bytes.as_bytes();
-    match fs::write(fdir, bytes) {
-        Err(e) => {
-            println!("Couldn't write to metadata file: {:?}", e);
-            std::process::exit(1);
-        } _ => Ok(())
-    }
-    // Ok(())
+    fs::write(fdir, bytes)?;
+    Ok(())
 }

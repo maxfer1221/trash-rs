@@ -1,5 +1,5 @@
-use std::io::{self, BufReader, prelude::*, ErrorKind};
-use std::fs::{self, File, read_dir};
+use std::io::{self, BufReader, prelude::*, Error, ErrorKind};
+use std::fs::{self, File};
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 //use toml;
@@ -35,24 +35,23 @@ impl Config {
     }
 }
 
-pub fn fetch_config() -> Config {
-    let conf_loc: PathBuf = find_conf();
+pub fn fetch_config() -> Result<Config, Error> {
+    let conf_loc: PathBuf = find_conf()?;
 
     match File::open(&conf_loc) {
         Err(error) => match error.kind() {
             ErrorKind::NotFound => {
-                let (file, config) = create_config_file(&conf_loc);
+                let (file, config) = create_config_file(&conf_loc)?;
                 write_config(&file, &config);
-                config
+                Ok(config)
             } other => {
                 println!("Error while opening configuration file: {:?}", other);
                 println!("Create new configuration file? (y/n)");
 
-                if parse_yn() {
-                    let (file, config) = create_config_file(&conf_loc);
-                    println!("{:?}", &config);
+                if parse_yn()? {
+                    let (file, config) = create_config_file(&conf_loc)?;
                     write_config(&file, &config);
-                    config
+                    Ok(config)
                 } else {
                     println!("Exiting");
                     std::process::exit(1);
@@ -72,18 +71,12 @@ pub fn fetch_config() -> Config {
                 _ => {},
             }
 
-            if let Ok(config) = toml::from_str(&contents) {
-                config
-            } else {
-                println!("Deserialization error. Do 'trash-rs clean' to reset configuration file");
-                std::process::exit(1);
-            }
+            Ok(toml::from_str(&contents)?)
         }
     }
 }
 
 fn write_config(mut file: &File, config: &Config) {
-    println!("{:?}", config);
     let toml_as_str: String = match toml::to_string(config) {
         Ok(s) => s,
         Err(e) => {
@@ -100,22 +93,19 @@ fn write_config(mut file: &File, config: &Config) {
     }
 }
 
-pub fn find_conf() -> PathBuf {
-    match dirs_next::config_dir() {
-        Some(mut buf) => {
-            buf.push("trash-rs");
-            buf.push("config");
-            buf.set_extension("toml");
-            buf
-        }
-        None => {
-            println!("OS \"config\" location unknown. Exiting");
-            std::process::exit(1);
-        }
-    }
+pub fn find_conf() -> Result<PathBuf, Error> {
+    let mut buf: PathBuf = match dirs_next::config_dir() {
+        Some(d) => d,
+        _ => return Err(std::io::Error::new(
+                ErrorKind::NotFound, "Could not find configuration directory")),
+    };
+    buf.push("trash-rs");
+    buf.push("config");
+    buf.set_extension("toml");
+    Ok(buf)
 }
 
-pub fn create_config_file(loc: &PathBuf) -> (File, Config) {
+pub fn create_config_file(loc: &PathBuf) -> Result<(File, Config), Error> {
     println!("Creating configuration file");
     let conf_file: File = match File::create(loc) {
         Err(e) => {
@@ -126,66 +116,47 @@ pub fn create_config_file(loc: &PathBuf) -> (File, Config) {
     };
 
     println!("Create trash directories again? WARNING: will overwrite old directories (y/n)");
-    let master_dir: PathBuf = create_master_dir();
+    let master_dir: PathBuf = create_master_dir()?;
     let config = Config::new(&master_dir);
 
-    println!("{:?}", &config);
 
     write_config(&conf_file, &config);
 
-    (conf_file, config)
+    Ok((conf_file, config))
 }
 
 // pub fn recreate_master_dir() {}
 
-pub fn create_master_dir() -> PathBuf {
+pub fn create_master_dir() -> Result<PathBuf, Error> {
     let mut master_dir: PathBuf;
 
-    print!("Where would you like the trash directory to be? ");
+    println!("Where would you like the trash directory to be? ");
     println!("Leave blank for the default locations:");
     println!("Lin: ~/.trash-rs/");
     println!("Win: C:\\Users\\your_name\\.trash-rs\\");
     println!("Mac: /Users/your_name/.trash-rs/");
 
     let mut desired_dir: String = String::new();
-    match io::stdin().read_line(&mut desired_dir) {
-        Err(e) => {
-            println!("Error reading input: {:?}", e);
-            println!("Exiting");
-            std::process::exit(1);
-        }
-        _ => {
-            if !(desired_dir.eq("\\n") || desired_dir.eq("\n") || desired_dir.is_empty()) {
-                master_dir = PathBuf::from(desired_dir);
-            } else {
-                if let Some(d) = dirs_next::home_dir() {
-                        master_dir = d;
-                        master_dir.push(".trash-rs");
-                } else {
-                    println!("Could not resolve home directory. Please try again and specify a directory");
-                    std::process::exit(1);
-                }
-            }
-        }
-    }
-
-    match read_dir(&master_dir) {
-        Err(e) => match e.kind() {
-            ErrorKind::NotFound => {
-                println!("Could not find directory. Attempting to create it now");
-                create_directories(&master_dir);
-                println!("Trash directory created");
-                master_dir
-            }
-            _ => {
-                println!("Error while reading directory given: {:?}", e);
+    io::stdin().read_line(&mut desired_dir)?;
+    if !(desired_dir.eq("\\n") || desired_dir.eq("\n") || desired_dir.is_empty()) {
+        master_dir = PathBuf::from(desired_dir);
+    } else {
+        master_dir = match dirs_next::home_dir() {
+            Some(p) => p,
+            None => {
+                println!("Could not resolve home directory");
                 std::process::exit(1);
             }
-        } _ =>  master_dir
+        };
+        master_dir.push(".trash-rs");
     }
+
+    create_directories(&master_dir)?;
+    println!("Trash directory created");
+    Ok(master_dir)
 }
 
-fn create_directories(md: &PathBuf) {
+fn create_directories(md: &PathBuf) -> Result<(), Error> {
     println!("{:?}", md);
 
     let mut tp = md.clone();
@@ -196,35 +167,14 @@ fn create_directories(md: &PathBuf) {
     meta.push("metadata");
     meta.set_extension("info");
 
-    match fs::create_dir_all(tp) {
-        Err(e) => {
-            println!("Error while creating directory: {:?}", e);
-            std::process::exit(1);
-        } _ => {}
-    }
-    
-    match fs::create_dir_all(ti) {
-        Err(e) => {
-            println!("Error while creating directory: {:?}", e);
-            std::process::exit(1);
-        } _ => {}
-    }
-
-    match File::create(meta) {
-        Err(e) => {
-            println!("Error while creating trash files: {:?}", e);
-            std::process::exit(1);
-        } _ => {},
-    }
+    fs::create_dir_all(tp)?; 
+    fs::create_dir_all(ti)?;
+    File::create(meta)?;
+    Ok(())
 }
 
-fn parse_yn() -> bool {
+fn parse_yn() -> Result<bool, Error> {
     let mut c: String = String::new();
-    match io::stdin().read_line(&mut c) {
-        Err(e) => {
-            println!("Error reading input: {:?}", e);
-            std::process::exit(1);
-        }
-        _ => c.eq("y") || c.eq("Y")
-    }
+    io::stdin().read_line(&mut c)?;
+    Ok(c.eq("y") || c.eq("Y"))
 }
