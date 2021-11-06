@@ -6,9 +6,8 @@ A trash-cli copy, but this time in Rust.
 - [x] Deletion
   - [x] Relative paths
   - [x] * functionality
-  - [ ] External file to save original file locations
-  - [ ] Non-empty directories (recursive solution coming up!)
-  - [ ] No overwrites
+  - [x] External file to save original file locations (kind of)
+  - [x] No overwrites (kind of)
     - [ ] Overwrite allowed flag
 - [x] List files
   - [ ] Include in Metadata:
