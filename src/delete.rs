@@ -78,13 +78,15 @@ fn delete_file(file: &String, config: &Config) -> Result<(PathBuf, PathBuf), Err
     temp_buf = PathBuf::from(&file);
     fname = config.dirs.trash_dir.clone();
     fname.push(temp_buf.file_name().unwrap());
-    
+   
+    println!("{:?}", fname.is_copy_obj(&config));
+
     if fname.is_copy_obj(config) {
         let n = fname.clone();
         let index: u64 = trash_contains(match n.file_name() {
             Some(n) => n,
             _ => OsStr::new(""),
-        }, &config.dirs.master_dir).1 + 1;
+        }, &config.dirs.master_dir).1;
         fname = fname.rename_dup(&config.copy_ext, index);
     } else {
         let (tc, c): (bool, u64) = trash_contains(match fname.file_name() {
@@ -93,7 +95,7 @@ fn delete_file(file: &String, config: &Config) -> Result<(PathBuf, PathBuf), Err
         }, &config.dirs.master_dir);
 
         fname = match tc {
-            true => fname.rename_dup(&config.copy_ext, c + 1),
+            true => fname.rename_dup(&config.copy_ext, c),
             false => fname,
         };
     }
@@ -165,24 +167,12 @@ fn write_master_metadata(f: &PathBuf, c: &Config) -> Result<(), Error> {
     fdir.push("metadata");
     fdir.set_extension("info");
 
-    let file: File = match File::open(&fdir){
-        Ok(f) => f,
-        Err(e) => {
-            println!("Could not open metadata file: {:?}", e);
-            std::process::exit(1);
-        }
-    };
+    let file: File = File::open(&fdir)?;
     let mut buf_reader = BufReader::new(&file);
     let mut contents = String::new();
 
-    match buf_reader.read_to_string(&mut contents) {
-        Err(error) => {
-            println!("Error reading metadata file: {:?}", error);
-            println!("Exiting");
-            std::process::exit(1);
-        },
-        _ => {},
-    }
+    buf_reader.read_to_string(&mut contents)?;
+
     let mut th: TrashHandler;
     let tc: TrashCopies = TrashCopies::new(match f.file_name() {
         Some(n) => match n.to_os_string().into_string() {
@@ -194,6 +184,7 @@ fn write_master_metadata(f: &PathBuf, c: &Config) -> Result<(), Error> {
         },
         None => String::new(),
     });
+
     if contents.is_empty() {
         th = TrashHandler::new();
     } else {
@@ -205,19 +196,32 @@ fn write_master_metadata(f: &PathBuf, c: &Config) -> Result<(), Error> {
             }
         };
     } 
-    
-    let stem: PathBuf = f.get_full_stem(c)?;
+    println!("th: {:?}", th);
+    let stem: String = match f.file_stem() {
+        Some(s) => match s.to_os_string().into_string() {
+            Ok(s) => s,
+            Err(e) => return Err(
+                std::io::Error::new(
+                    std::io::ErrorKind::Unsupported, "Could not get file stem"))
+        },
+        None => String::new(),
+    };
 
     let mut present: bool = false;
     for mut file in &mut th.files {
         println!("{:?}", file);
-        let fstr: String = match stem.clone().into_os_string().into_string() {
-            Ok(s) => s,
-            Err(s) => {
-                println!("Could not convert file to string: {:?}", s);
-                std::process::exit(1);
-            },
-        };
+        let fstr: String = stem.clone();
+        // .into_os_string().into_string() {
+        //     Ok(s) => s,
+        //     Err(s) => {
+        //         println!("Could not convert file to string: {:?}", s);
+        //         std::process::exit(1);
+        //     },
+        // };
+        println!("fstr: {:?}", &fstr);
+        println!("file.name: {:?}", &file.name);
+        println!("file: {:?}", &file);
+        println!("{}", fstr.eq(&file.name));
         if fstr.eq(&file.name) {
             file.copies += 1;
             present = true;
