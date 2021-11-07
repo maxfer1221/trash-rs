@@ -84,7 +84,7 @@ fn write_metadata(o: &PathBuf, f: &PathBuf, c: &Config) -> Result<(), Error> {
     };
 
     final_file.set_extension(match final_ext.is_empty() {
-        true => String::from("into"),
+        true => String::from("info"),
         false => format!("{}.{}", final_ext, "info"),
     });
     
