@@ -1,14 +1,13 @@
 use std::{path::PathBuf, env, time::SystemTime};
 use std::fs::{self, rename};
-// use std::io::{Read, BufReader};
 use std::io::{Error, ErrorKind};
 use crate::config::Config;
 use crate::trash::{TrashFile};
 use humantime;
 
 macro_rules! err {
-    ( ) => {
-        Error::new(ErrorKind::Other, "");
+    ( $e:expr ) => {
+        Error::new(ErrorKind::Other, format!("{:?}",$e));
     }
 }
 
@@ -26,27 +25,33 @@ fn delete_file(file: &String, config: &Config) -> Result<(PathBuf, PathBuf), Err
     temp_buf = PathBuf::from(&file);
     
     let mut fname: PathBuf = config.dirs.trash_dir.clone();
-    fname.push(temp_buf.file_name().ok_or(err!())?);
+    fname.push(temp_buf.file_name().ok_or(err!("Could not find file name"))?);
 
-    let mut copy_count: u64 = 0;
-    
-    let stem: String = fname.file_stem().ok_or(err!())?.to_os_string()
-                            .into_string().map_err(|_e| err!())?;
+    let stem: String = fname.file_stem().ok_or(err!("Could not find file stem"))?
+                            .to_os_string().into_string().map_err(|e| err!(e))?;
 
     let ext: String = format!(".{}", match fname.extension() {
-        Some(s) => s.to_os_string().into_string().map_err(|_e| err!())?,
+        Some(s) => s.to_os_string().into_string().map_err(|e| err!(e))?,
         None => String::new(),
     });
     
+    let mut copy_count: u64 = 0;
     let no_overwrite: bool = true;
-    while fname.exists() || no_overwrite {
+    
+    while fname.exists() && no_overwrite {
         copy_count += 1;
-        fname.set_file_name(format!("{}({})", stem, copy_count));
-    } 
+        
+        fname.set_file_name(format!("{}({})", &stem, &copy_count));
+        fname.set_extension(&ext);
+    }
 
     let mut oname: PathBuf; 
-    oname = env::current_dir()?;
-    oname.push(file);
+    if temp_buf.is_absolute() {
+        oname = temp_buf;
+    } else { 
+        oname = env::current_dir()?;
+        oname.push(file);
+    }
 
     rename(oname.clone(), fname.clone())?;
         
@@ -60,42 +65,21 @@ fn write_metadata(o: &PathBuf, f: &PathBuf, c: &Config) -> Result<(), Error> {
     time_as_string.pop();
 
     let tf: TrashFile = TrashFile::new(&o, &time_as_string);
-    let toml_as_string: String = match toml::to_string(&tf) {
-        Ok(s) => s,
-        Err(e) => {
-            println!("Could not serialize metadata: {:?}", e);
-            std::process::exit(1);
-        }
-    };
+    let toml_as_string: String = toml::to_string(&tf).map_err(|e| err!(e))?;
 
     let mut final_file: PathBuf = c.dirs.trash_info.clone();
-    final_file.push(match f.file_name() {
-        Some(n) => match n.to_os_string().into_string() {
-            Ok(s) => s,
-            Err(os) => {
-                println!("Could not convert OsString: {:?}", os);
-                std::process::exit(1);
-            }
-        },
-        _ => String::new(),
-    });
+    final_file.push(f.file_name().ok_or(err!("Could not find file name"))?
+                    .to_os_string().into_string().map_err(|e| err!(e))?);
     
     let final_ext: String = match final_file.extension() {
-        Some(ext) => match ext.to_os_string().into_string() {
-            Ok(s) => s,
-            Err(e) => {
-                println!("Could not resolve file extension: {:?}", e);
-                std::process::exit(1);
-            },
-        },
+        Some(ext) => ext.to_os_string().into_string().map_err(|e| err!(e))?,
         None => String::new(),
     };
 
-    if !final_ext.is_empty() {
-        final_file.set_extension(format!("{}.{}", final_ext, "info"));
-    } else {
-        final_file.set_extension("info");
-    }
+    final_file.set_extension(match final_ext.is_empty() {
+        true => String::from("into"),
+        false => format!("{}.{}", final_ext, "info"),
+    });
     
     let bytes: &[u8] = toml_as_string.as_bytes();
     fs::write(final_file, bytes)?;
