@@ -1,4 +1,5 @@
-use std::{io::{self, Error, ErrorKind, BufReader, Read}, fs};
+use std::{path::PathBuf, ffi::OsStr, fs};
+use std::io::{self, Error, ErrorKind, BufReader, Read};
 use crate::config::Config;
 use crate::trash::TrashFile;
 
@@ -23,7 +24,9 @@ pub fn list_objects(_extra: Vec<String>, config: &Config) -> Result<(), Error> {
             .map_err(|_e| Error::new(ErrorKind::Other, "Could not convert OsString to string"))?;
 
         println!("{0: <10}\t\t{1: <10}\t{2: <10}",
-            file.file_name().to_str().unwrap_or(""),
+            PathBuf::from(file.path()).file_stem()
+                .unwrap_or(OsStr::new("")).to_os_string().into_string()
+                .unwrap_or(String::new()),
             mod_date,
             o_path
         ); 

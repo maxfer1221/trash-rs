@@ -37,19 +37,21 @@ fn delete_file(file: &String, wo: &WriteOptions, config: &Config) -> Result<(Pat
     let stem: String = fname.file_stem().ok_or(err!("Could not find file stem"))?
                             .to_os_string().into_string().map_err(|e| err!(e))?;
 
-    let ext: String = format!(".{}", match fname.extension() {
+    let ext: String = match fname.extension() {
         Some(s) => s.to_os_string().into_string().map_err(|e| err!(e))?,
         None => String::new(),
-    });
+    };
     
     let mut copy_count: u64 = 0;
     let overwrite_enabled: bool = wo.overwrite_enabled;
 
     while fname.exists() && !overwrite_enabled {
-        copy_count += 1;
-        
+        copy_count += 1; 
         fname.set_file_name(format!("{}({})", &stem, &copy_count));
-        fname.set_extension(&ext);
+        match ext.is_empty() {
+            false => fname.set_extension(&ext),
+            _ => true,
+        };
     }
 
     let mut oname: PathBuf; 
@@ -83,10 +85,13 @@ fn write_metadata(o: &PathBuf, f: &PathBuf, c: &Config) -> Result<(), Error> {
         None => String::new(),
     };
 
+    println!("{}", final_ext.is_empty());
+    println!("{:?}", final_file);
     final_file.set_extension(match final_ext.is_empty() {
         true => String::from("info"),
         false => format!("{}.{}", final_ext, "info"),
     });
+    println!("{:?}", final_file);
     
     let bytes: &[u8] = toml_as_string.as_bytes();
     fs::write(final_file, bytes)?;
