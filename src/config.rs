@@ -2,8 +2,6 @@ use std::io::{self, BufReader, prelude::*, Error, ErrorKind};
 use std::fs::{self, File};
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
-//use toml;
-//use dirs_next;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
@@ -76,21 +74,12 @@ pub fn fetch_config() -> Result<Config, Error> {
     }
 }
 
-fn write_config(mut file: &File, config: &Config) {
-    let toml_as_str: String = match toml::to_string(config) {
-        Ok(s) => s,
-        Err(e) => {
-            println!("Serializing error: {:?}", e);
-            std::process::exit(1);
-        }
-    };
+fn write_config(mut file: &File, config: &Config) -> Result<(), Error> {
+    let toml_as_str: String = toml::to_string(config)
+        .unwrap_or(Err(Error::new(ErrorKind::Other, "Could not serialize config"))?);
     let bytes: &[u8] = (toml_as_str).as_bytes();
-    match file.write(bytes) {
-        Err(e) => {
-            println!("Error writing to configuration file: {:?}", e);
-        }
-        _ => {}
-    }
+    file.write(bytes)?;
+    Ok(())
 }
 
 pub fn find_conf() -> Result<PathBuf, Error> {

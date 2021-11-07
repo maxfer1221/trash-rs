@@ -7,11 +7,11 @@ A trash-cli copy, but this time in Rust.
   - [x] Relative paths
   - [x] * functionality
   - [x] External file to save original file locations (kind of)
-  - [x] No overwrites (kind of)
+  - [x] No overwrites
     - [ ] Overwrite allowed flag
 - [x] List files
-  - [ ] Include in Metadata:
-    - [ ] Original directory
+  - [x] Include in metadata:
+    - [x] Original directory
     - [x] Date deleted
 - [ ] Empty trash
   - [ ] * functionality

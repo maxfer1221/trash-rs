@@ -1,5 +1,4 @@
 use crate::config::Config;
-// use std::fs;
 
 pub trait PermDelete {
     fn perm_delete(&self, config: &Config) -> std::io::Result<()>;
@@ -7,7 +6,6 @@ pub trait PermDelete {
 
 impl PermDelete for String { 
     fn perm_delete(&self, config: &Config) -> std::io::Result<()> {
-        // fix_master_metadata();
         Ok(())
     }
 }

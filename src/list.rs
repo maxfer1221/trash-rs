@@ -1,43 +1,33 @@
-use std::{io, fs};
-// use std::time::SystemTime;
+use std::{io::{self, Error, ErrorKind, BufReader, Read}, fs};
 use crate::config::Config;
-// use humantime;
+use crate::trash::TrashFile;
 
-pub fn list_objects(_extra: Vec<String>, config: &Config) -> std::io::Result<()> {
-    let files = fs::read_dir(&config.dirs.trash_dir)?
+pub fn list_objects(_extra: Vec<String>, config: &Config) -> Result<(), Error> {
+    let files = fs::read_dir(&config.dirs.trash_info)?
         .collect::<Result<Vec<_>, io::Error>>()?;
   
-    println!("{0: <10}\t{1: <10}\t\t{2: <10}",
-             "Name", "Date Modified", "Directory");
+    println!("{0: <10}\t\t{1: <10}\t\t{2: <10}",
+             "Name", "Date Modified", "Original Location");
 
 
-    for file in files {
-        let metadata: Result<fs::Metadata, std::io::Error> = 
-            fs::metadata(file.path());
-        let is_dir: &str = match metadata {
-            Ok(ref m) => match m.is_dir() {
-                true  => "Yes",
-                false => "No"
-            },  _     => "NaN",
-        };
-        let mod_date: String = match metadata {
-            Ok(m) => match m.modified() {
-                Ok(_t) => {
-                    String::new()
-                },
-                _ => String::from("NaN"),
-            },  _ => String::from("NaN"),
-        };
+    for file in files { 
+        let mut buf_reader = 
+            BufReader::new(fs::File::open(file.path())?);
+        let mut contents = String::new(); 
+        buf_reader.read_to_string(&mut contents)?;
         
-        println!("{0: <10}\t{1: <10}\t{2: <10}", 
-            file.file_name().to_str().unwrap(),
+        let trash_file: TrashFile = toml::from_str(&contents)?;
+        let mod_date: String = trash_file.date;
+        
+        let metadata: fs::Metadata = file.metadata()?;
+        let o_path: String = trash_file.path.into_os_string().into_string()
+            .map_err(|_e| Error::new(ErrorKind::Other, "Could not convert OsString to string"))?;
+
+        println!("{0: <10}\t\t{1: <10}\t{2: <10}",
+            file.file_name().to_str().unwrap_or(""),
             mod_date,
-            // match humantime::format_rfc3339_seconds(&mod_date) {
-            //     Ok(t) => t.to_string(),
-            //     Err(_e) => String::from("NaN"),
-            // },
-            is_dir
-        );
+            o_path
+        ); 
     }
 
     Ok(())

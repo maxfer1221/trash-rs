@@ -3,8 +3,8 @@ use std::path::PathBuf;
     
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TrashFile {
-    path: PathBuf,
-    date: String,
+    pub path: PathBuf,
+    pub date: String,
 }
 
 impl TrashFile {
