@@ -1,4 +1,4 @@
-use std::{str::FromStr, env, fs, path::PathBuf, io::{Error, ErrorKind}};
+use std::{str::FromStr, env, path::PathBuf, io::Error};
 mod config;
 mod delete;
 mod trash;
@@ -65,7 +65,7 @@ fn main() {
                         panic_!("Error fetching configuration file: {:?}", e);
                     }
                 };
-                match delete::delete_files(rest, &conf) {
+                match delete::delete_files(rest, flags, &conf) {
                     Err(e) => {
                         panic_!("Error deleting files: {:?}", e);
                     }

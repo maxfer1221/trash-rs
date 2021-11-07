@@ -8,7 +8,7 @@ A trash-cli copy, but this time in Rust.
   - [x] * functionality
   - [x] External file to save original file locations (kind of)
   - [x] No overwrites
-    - [ ] Overwrite allowed flag
+    - [x] Overwrite allowed flag
 - [x] List files
   - [x] Include in metadata:
     - [x] Original directory

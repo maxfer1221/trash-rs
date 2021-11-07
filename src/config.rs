@@ -40,7 +40,7 @@ pub fn fetch_config() -> Result<Config, Error> {
         Err(error) => match error.kind() {
             ErrorKind::NotFound => {
                 let (file, config) = create_config_file(&conf_loc)?;
-                write_config(&file, &config);
+                write_config(&file, &config)?;
                 Ok(config)
             } other => {
                 println!("Error while opening configuration file: {:?}", other);
@@ -48,7 +48,7 @@ pub fn fetch_config() -> Result<Config, Error> {
 
                 if parse_yn()? {
                     let (file, config) = create_config_file(&conf_loc)?;
-                    write_config(&file, &config);
+                    write_config(&file, &config)?;
                     Ok(config)
                 } else {
                     println!("Exiting");
@@ -109,7 +109,7 @@ pub fn create_config_file(loc: &PathBuf) -> Result<(File, Config), Error> {
     let config = Config::new(&master_dir);
 
 
-    write_config(&conf_file, &config);
+    write_config(&conf_file, &config)?;
 
     Ok((conf_file, config))
 }

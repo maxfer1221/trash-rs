@@ -19,7 +19,6 @@ pub fn list_objects(_extra: Vec<String>, config: &Config) -> Result<(), Error> {
         let trash_file: TrashFile = toml::from_str(&contents)?;
         let mod_date: String = trash_file.date;
         
-        let metadata: fs::Metadata = file.metadata()?;
         let o_path: String = trash_file.path.into_os_string().into_string()
             .map_err(|_e| Error::new(ErrorKind::Other, "Could not convert OsString to string"))?;
 

@@ -11,23 +11,15 @@ macro_rules! err {
     }
 }
 
-struct WriteOptions {
-    pub overwrite_enabled: bool,
-}
-
-pub fn delete_files(files: Vec<String>, flags: Vec<String>, config: &Config) -> Result<(), Error> {
-    let write_options: WriteOptions = WriteOptions { 
-        overwrite_enabled: flags.iter().any(|f| f.contains("o")),
-    };
+pub fn restore_files(files: Vec<String>, config: &Config) -> Result<(), Error> {
     for file in files.iter().skip(2) {
-        let (o, f): (PathBuf, PathBuf) =
-            delete_file(file, &write_options, &config)?;
+        let (o, f): (PathBuf, PathBuf) = delete_file(file, &config)?;
         write_metadata(&o, &f, &config)?;
     }
     Ok(())
 }
 
-fn delete_file(file: &String, wo: &WriteOptions, config: &Config) -> Result<(PathBuf, PathBuf), Error> { 
+fn delete_file(file: &String, config: &Config) -> Result<(PathBuf, PathBuf), Error> { 
     let temp_buf: PathBuf; 
     temp_buf = PathBuf::from(&file);
     
@@ -43,9 +35,9 @@ fn delete_file(file: &String, wo: &WriteOptions, config: &Config) -> Result<(Pat
     });
     
     let mut copy_count: u64 = 0;
-    let overwrite_enabled: bool = wo.overwrite_enabled;
-
-    while fname.exists() && !overwrite_enabled {
+    let no_overwrite: bool = true;
+    
+    while fname.exists() && no_overwrite {
         copy_count += 1;
         
         fname.set_file_name(format!("{}({})", &stem, &copy_count));

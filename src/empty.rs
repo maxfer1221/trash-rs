@@ -1,11 +1,11 @@
 use crate::config::Config;
 
 pub trait PermDelete {
-    fn perm_delete(&self, config: &Config) -> std::io::Result<()>;
+    fn perm_delete(&self, _config: &Config) -> std::io::Result<()>;
 }
 
 impl PermDelete for String { 
-    fn perm_delete(&self, config: &Config) -> std::io::Result<()> {
+    fn perm_delete(&self, _config: &Config) -> std::io::Result<()> {
         Ok(())
     }
 }
