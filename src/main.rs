@@ -1,11 +1,16 @@
-//use std::{str::FromStr, env, fs::{File, self}};
-//use std::{str::FromStr, env, fs};
 use std::{str::FromStr, env, fs, path::PathBuf, io::{Error, ErrorKind}};
 mod config;
 mod delete;
-mod list;
 mod trash;
 mod empty;
+mod list;
+
+macro_rules! panic_ {
+    ( $s:expr, $e:expr ) => {
+        println!($s, $e);
+        std::process::exit(1);
+    }
+}
 
 #[derive(Debug, PartialEq)]
 enum Function {
@@ -27,7 +32,7 @@ impl FromStr for Function {
             "empty"      => Ok(Function::Empty),
             "change-dir" => Ok(Function::ChangeDir(None)),
             "restore"    => Ok(Function::Restore(None)),
-            "clean"     => Ok(Function::Clean),
+            "clean"      => Ok(Function::Clean),
             _            => Err(()),
         }
     }
@@ -36,9 +41,9 @@ impl FromStr for Function {
 fn main() {
     let args: &[String] = &env::args().collect::<Vec<String>>(); 
     let flags = args.iter().filter(|a| a.starts_with('-'))
-        .cloned().collect::<Vec<String>>();
+                    .cloned().collect::<Vec<String>>();
     let rest  = args.iter().filter(|a| !a.starts_with('-'))
-        .cloned().collect::<Vec<String>>();
+                    .cloned().collect::<Vec<String>>();
     let help: bool = flags.iter().any(|f| f == "-h" || f == "--help");
 
     let conf: config::Config;
@@ -57,13 +62,12 @@ fn main() {
                 conf = match fetch_config() {
                     Ok(c) => c,
                     Err(e) => {
-                        println!("Error fetching configuration file: {:?}", e);
-                        std::process::exit(1);
+                        panic_!("Error fetching configuration file: {:?}", e);
                     }
                 };
                 match delete::delete_files(rest, &conf) {
                     Err(e) => {
-                        println!("{:?}", e);
+                        panic_!("Error deleting files: {:?}", e);
                     }
                     _ => {}
                 }
@@ -76,13 +80,12 @@ fn main() {
                 conf = match fetch_config() {
                     Ok(c) => c,
                     Err(e) => {
-                        println!("Error fetching configuration file: {:?}", e);
-                        std::process::exit(1);
+                        panic_!("Error fetching configuration file: {:?}", e);
                     }
                 };
                 match list::list_objects(rest, &conf) {
                     Err(e) => {
-                        println!("{:?}", e);
+                        panic_!("Error listing files: {:?}", e);
                     }
                     _ => {}
                 }
@@ -96,12 +99,14 @@ fn main() {
                 conf = match fetch_config() {
                     Ok(c) => c,
                     Err(e) => {
-                        println!("Error fetching configuration file: {:?}", e);
-                        std::process::exit(1);
+                        panic_!("Error fetching configuration file: {:?}", e);
                     }
                 };
-                empty::perm_delete_files(rest, &conf);
-                println!("Empty!");
+                match empty::perm_delete_files(rest, &conf) {
+                    Err(e) => {
+                        panic_!("Error emptying trash directory: {:?}", e);
+                    }, _ => {}
+                };
             }
         }
         Ok(Function::ChangeDir(_)) => {
@@ -170,20 +175,5 @@ fn main() {
 
 fn fetch_config() -> Result<config::Config, Error> {
     let conf: config::Config = config::fetch_config()?;
-    match fs::read_dir(&conf.dirs.trash_dir) {
-        Err(error) => {
-            match error.kind() {
-                ErrorKind::NotFound => match fs::create_dir(&conf.dirs.trash_dir) {
-                    Err(e) => {
-                        println!("Problem creating trash directory: {:?}", e);
-                        std::process::exit(1);
-                    } _ => {}
-                } other => {
-                    println!("Problem reading trash directory: {:?}", other);
-                    std::process::exit(1);
-                }
-            }
-        } _ => {}
-    }
     Ok(conf)
 }

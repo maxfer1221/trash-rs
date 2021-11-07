@@ -15,7 +15,6 @@ pub fn delete_files(files: Vec<String>, config: &Config) -> Result<(), Error> {
     for file in files.iter().skip(2) {
         let (o, f): (PathBuf, PathBuf) = delete_file(file, &config)?;
         write_metadata(&o, &f, &config)?;
-        // write_master_metadata(&f, &config)?;
     }
     Ok(())
 }
