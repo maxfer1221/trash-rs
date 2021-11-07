@@ -5,6 +5,7 @@ mod config;
 mod delete;
 mod list;
 mod trash;
+mod empty;
 
 #[derive(Debug, PartialEq)]
 enum Function {
@@ -92,7 +93,14 @@ fn main() {
                 println!("Usage: trash-rs empty FILE\n  or:  trash-rs empty FILES...\n");
                 println!("Permanently deletes specified files currently in the trash");
             } else {
-                // conf = fetch_config();
+                conf = match fetch_config() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        println!("Error fetching configuration file: {:?}", e);
+                        std::process::exit(1);
+                    }
+                };
+                empty::perm_delete_files(rest, &conf);
                 println!("Empty!");
             }
         }
