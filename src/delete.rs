@@ -1,6 +1,5 @@
 use std::{path::PathBuf, env, time::SystemTime};
-use std::fs::{self, rename};
-use std::io::{Error, ErrorKind};
+use std::{fs::{self, rename}, io::{Error, ErrorKind}};
 use crate::config::Config;
 use crate::trash::{TrashFile};
 use humantime;
