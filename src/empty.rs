@@ -1,25 +1,20 @@
 use crate::config::Config;
+use crate::trash::TrashFile;
+use std::{fs, path::PathBuf};
 
-pub trait PermDelete {
-    fn perm_delete(&self, _config: &Config) -> std::io::Result<()>;
-}
-
-impl PermDelete for String { 
-    fn perm_delete(&self, _config: &Config) -> std::io::Result<()> {
-        Ok(())
+pub fn perm_delete_files(files: Vec<String>, config: &Config) -> std::io::Result<()> {
+    for file in files.iter().skip(2) {
+        println!("{:?}", file);
+        erase_metadata(&config.dirs.trash_info, &file)?;
     }
+    Ok(())
 }
 
-impl PermDelete for Vec<String> {
-    fn perm_delete(&self, config: &Config) -> std::io::Result<()> {
-        for file in self {
-            String::perm_delete(file, config)?;
-        }
-        Ok(())
-    }
-}
-
-pub fn perm_delete_files<T: PermDelete>(files: T, config: &Config) -> std::io::Result<()> {
-    files.perm_delete(config)?;
+fn erase_metadata(i: &PathBuf) -> std::io::Result<()> {
+    let mut entries = fs::read_dir(i)?
+        .map(|res| res.map(|e| e.path()))
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    
+    println!("{:?}", entries);
     Ok(())
 }

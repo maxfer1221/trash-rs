@@ -8,7 +8,7 @@ pub fn list_objects(_extra: Vec<String>, config: &Config) -> Result<(), Error> {
         .collect::<Result<Vec<_>, io::Error>>()?;
   
     println!("{0: <10}\t\t{1: <10}\t\t{2: <10}",
-             "Name", "Date Modified", "Original Location");
+             "Name", "Date Removed", "Original Location");
 
 
     for file in files { 
